@@ -1,17 +1,28 @@
-from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy import event
+from sqlmodel import Session, SQLModel, create_engine
+
+from config import settings
 
 # Модели нужно импортировать, чтобы create_all увидел таблицы
-from models.weather import Location, WeatherObservation  # noqa: F401
+from models.weather import (  # noqa: F401
+    DataSource, ImportBatch, Location, WeatherObservation,
+)
 
-database_file = "weather_data.db"
-database_connection_string = f"sqlite:///{database_file}"
-connect_args = {"check_same_thread": False}
+_is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if _is_sqlite else {}
 
 engine_url = create_engine(
-    database_connection_string,
-    echo=True,
+    settings.database_url,
+    echo=settings.sql_echo,
     connect_args=connect_args,
 )
+
+if _is_sqlite:
+    @event.listens_for(engine_url, "connect")
+    def _enable_foreign_keys(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def conn():

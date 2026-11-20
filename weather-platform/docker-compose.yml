@@ -1,0 +1,28 @@
+services:
+  weather_data:
+    build: ./weather_data_service
+    environment:
+      DATABASE_URL: sqlite:////data/weather_data.db
+      AUTO_SYNC: "true"
+      ALL_PROXY: socks5h://${WIN_HOST:?запускай через ./up.sh}:10808
+    volumes:
+      - ./db:/data
+    ports:
+      - "8003:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  visualization:
+    build: ./visualization_service
+    environment:
+      DATA_SERVICE_URL: http://weather_data:8003
+    ports:
+      - "8002:8002"
+    depends_on:
+      weather_data:
+        condition: service_healthy
+    restart: unless-stopped
